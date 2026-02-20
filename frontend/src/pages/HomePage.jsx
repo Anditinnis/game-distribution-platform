@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+// Временно перехватываем все fetch запросы для отладки
+const originalFetch = window.fetch;
+window.fetch = function(...args) {
+  console.log('🌐 FETCH:', args[0]);
+  return originalFetch.apply(this, args);
+};
+
+// Не забудьте восстановить позже
+// window.fetch = originalFetch;
 // Используем переменную окружения для API URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
