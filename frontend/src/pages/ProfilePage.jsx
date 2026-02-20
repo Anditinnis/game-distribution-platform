@@ -35,6 +35,26 @@ const ProfilePage = () => {
     }
   };
 
+  // БЕЗОПАСНОЕ ФОРМАТИРОВАНИЕ БАЛАНСА
+  const formatBalance = (balance) => {
+    if (balance === undefined || balance === null) return '0.00';
+    
+    // Если это строка, пробуем преобразовать в число
+    if (typeof balance === 'string') {
+      const num = parseFloat(balance);
+      return isNaN(num) ? '0.00' : num.toFixed(2);
+    }
+    
+    // Если это число
+    if (typeof balance === 'number') {
+      return balance.toFixed(2);
+    }
+    
+    // Если это объект или что-то еще
+    console.warn('Неизвестный тип баланса:', typeof balance, balance);
+    return '0.00';
+  };
+
   const getRoleDisplay = () => {
     if (!user?.role) return 'Пользователь';
     
@@ -131,7 +151,8 @@ const ProfilePage = () => {
                 <div className="p-5 bg-blue-50 rounded-xl border border-blue-100">
                   <div className="text-sm text-blue-600 mb-1">Баланс</div>
                   <div className="text-2xl font-bold text-blue-700">
-                    {user?.balance?.toFixed(2) || '0.00'} ₽
+                    {/* ✅ ИСПОЛЬЗУЕМ БЕЗОПАСНУЮ ФУНКЦИЮ */}
+                    {formatBalance(user?.balance)} ₽
                   </div>
                   <div className="text-xs text-blue-500 mt-1">
                     Доступно для вывода
@@ -252,7 +273,7 @@ const ProfilePage = () => {
         </div>
 
         {/* Отладочная информация (только в разработке) */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.DEV && (
           <div className="mt-4 p-4 bg-gray-100 rounded-lg">
             <details>
               <summary className="text-sm text-gray-500 cursor-pointer">
