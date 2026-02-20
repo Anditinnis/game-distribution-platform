@@ -1,0 +1,381 @@
+<!-- backend/templates/api_navigator.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Navigator - Game Platform</title>
+    <style>
+        /* Здесь весь CSS из предыдущего ответа */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        .nav-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .nav-tab {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: #f0f2f5;
+            color: #666;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .nav-tab:hover {
+            background: #e0e2e5;
+            transform: translateY(-2px);
+        }
+        .nav-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .section {
+            display: none;
+        }
+        .section.active {
+            display: block;
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+        .api-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .api-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+        .api-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .api-method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 10px;
+        }
+        .method-get { background: #61affe; }
+        .method-post { background: #49cc90; }
+        .method-put { background: #fca130; }
+        .method-delete { background: #f93e3e; }
+        .api-url {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            word-break: break-all;
+            font-size: 0.9em;
+            border: 1px solid #ddd;
+        }
+        .api-url a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .api-url a:hover {
+            text-decoration: underline;
+        }
+        .api-description {
+            color: #666;
+            margin: 10px 0;
+            font-size: 0.95em;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: bold;
+            color: white;
+            margin-left: 5px;
+        }
+        .badge-auth { background: #f39c12; }
+        .badge-admin { background: #e74c3c; }
+        .badge-dev { background: #3498db; }
+        .server-info {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .ip-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .ip-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .ip-item strong {
+            display: block;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .quick-tools {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .tool-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        .tool-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .tool-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .response-area {
+            margin-top: 15px;
+            padding: 10px;
+            background: #333;
+            color: #fff;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.85em;
+            max-height: 200px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Game Platform API Navigator</h1>
+            <p>Удобная навигация по всем эндпоинтам вашего Django приложения</p>
+            
+            <div class="server-info">
+                <h3>🌐 Статистика платформы</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                    <div class="ip-item">
+                        <strong>Всего игр:</strong>
+                        <span>{{ total_games }}</span>
+                    </div>
+                    <div class="ip-item">
+                        <strong>Пользователей:</strong>
+                        <span>{{ total_users }}</span>
+                    </div>
+                    <div class="ip-item">
+                        <strong>Покупок:</strong>
+                        <span>{{ total_purchases }}</span>
+                    </div>
+                    <div class="ip-item">
+                        <strong>Опубликовано игр:</strong>
+                        <span>{{ published_games }}</span>
+                    </div>
+                    <div class="ip-item">
+                        <strong>Разработчиков:</strong>
+                        <span>{{ developers }}</span>
+                    </div>
+                    <div class="ip-item">
+                        <strong>Серверное время:</strong>
+                        <span>{{ server_time|date:"d.m.Y H:i:s" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showSection('users')">👥 Пользователи</button>
+            <button class="nav-tab" onclick="showSection('games')">🎮 Игры</button>
+            <button class="nav-tab" onclick="showSection('purchases')">💰 Покупки</button>
+            <button class="nav-tab" onclick="showSection('reviews')">⭐ Отзывы</button>
+            <button class="nav-tab" onclick="showSection('forum')">💬 Форум</button>
+        </div>
+
+        <div class="content">
+            <input type="text" id="searchInput" placeholder="🔍 Поиск эндпоинтов..." style="width: 100%; padding: 15px; margin-bottom: 20px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; outline: none;">
+
+            <div id="section-users" class="section active">
+                <h2>👥 Пользователи / Аутентификация</h2>
+                <div class="api-grid" id="usersGrid"></div>
+            </div>
+
+            <div id="section-games" class="section">
+                <h2>🎮 Игры</h2>
+                <div class="api-grid" id="gamesGrid"></div>
+            </div>
+
+            <div id="section-purchases" class="section">
+                <h2>💰 Покупки и платежи</h2>
+                <div class="api-grid" id="purchasesGrid"></div>
+            </div>
+
+            <div id="section-reviews" class="section">
+                <h2>⭐ Отзывы и рейтинги</h2>
+                <div class="api-grid" id="reviewsGrid"></div>
+            </div>
+
+            <div id="section-forum" class="section">
+                <h2>💬 Форум и обсуждения</h2>
+                <div class="api-grid" id="forumGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currentUrl = window.location.origin;
+        
+        const apiEndpoints = {
+            users: [
+                { method: 'GET', url: '/api/users/', desc: 'Список всех пользователей', auth: false },
+                { method: 'GET', url: '/api/users/me/', desc: 'Текущий пользователь', auth: true },
+                { method: 'POST', url: '/api/users/register/', desc: 'Регистрация', auth: false },
+                { method: 'POST', url: '/api/users/login/', desc: 'Вход', auth: false },
+                { method: 'GET', url: '/api/users/{id}/', desc: 'Детали пользователя', auth: false }
+            ],
+            games: [
+                { method: 'GET', url: '/api/games/', desc: 'Список игр с фильтрацией', auth: false },
+                { method: 'GET', url: '/api/games/my_games/', desc: 'Мои игры (для разработчика)', auth: true, role: 'developer' },
+                { method: 'POST', url: '/api/games/', desc: 'Создать игру', auth: true, role: 'developer' },
+                { method: 'GET', url: '/api/games/{id}/', desc: 'Детали игры', auth: false },
+                { method: 'GET', url: '/api/games/{id}/download/', desc: 'Скачать игру', auth: true }
+            ],
+            purchases: [
+                { method: 'GET', url: '/api/purchases/', desc: 'Мои покупки', auth: true },
+                { method: 'POST', url: '/api/purchases/buy/', desc: 'Купить/арендовать игру', auth: true }
+            ],
+            reviews: [
+                { method: 'GET', url: '/api/reviews/', desc: 'Список отзывов', auth: false },
+                { method: 'POST', url: '/api/reviews/', desc: 'Создать отзыв', auth: true }
+            ],
+            forum: [
+                { method: 'GET', url: '/api/forum/categories/', desc: 'Категории форума', auth: false },
+                { method: 'GET', url: '/api/forum/topics/', desc: 'Темы форума', auth: false },
+                { method: 'POST', url: '/api/forum/topics/', desc: 'Создать тему', auth: true },
+                { method: 'GET', url: '/api/forum/topics/{id}/posts/', desc: 'Сообщения темы', auth: false },
+                { method: 'POST', url: '/api/forum/topics/{id}/add_post/', desc: 'Добавить сообщение', auth: true }
+            ]
+        };
+
+        function createApiCard(endpoint) {
+            const methodClass = `method-${endpoint.method.toLowerCase()}`;
+            const badges = [];
+            if (endpoint.auth) badges.push('<span class="badge badge-auth">Auth</span>');
+            if (endpoint.role) badges.push(`<span class="badge badge-${endpoint.role === 'admin' ? 'admin' : 'dev'}">${endpoint.role}</span>`);
+            
+            return `
+                <div class="api-card">
+                    <span class="api-method ${methodClass}">${endpoint.method}</span>
+                    ${badges.join('')}
+                    <div class="api-url">
+                        <a href="${currentUrl}${endpoint.url}" target="_blank">${endpoint.url}</a>
+                    </div>
+                    <div class="api-description">${endpoint.desc}</div>
+                </div>
+            `;
+        }
+
+        // Заполнение секций
+        for (const [section, endpoints] of Object.entries(apiEndpoints)) {
+            const grid = document.getElementById(`${section}Grid`);
+            if (grid) {
+                grid.innerHTML = endpoints.map(createApiCard).join('');
+            }
+        }
+
+        function showSection(section) {
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(`section-${section}`).classList.add('active');
+        }
+
+        // Поиск
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('.api-card').forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
