@@ -17,7 +17,7 @@ import './App.css';
 
 // Конфигурация API
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-const WS_URL = import.meta.env.REACT_APP_WS_URL || 'ws://localhost:8000';
+const WS_URL = import.meta.env.REACT_WS_URL || 'ws://localhost:8000';
 
 // Компонент навигации
 const Navigation = () => {
@@ -140,7 +140,7 @@ const Footer = () => {
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch(`${API_URL}/api/games/`, {
+        const response = await fetch(`${API_URL}/games/`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal
