@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import axios from 'axios';
+import apiClient from '../api/client'; // Импортируем наш API клиент
 
-const API_URL = 'http://127.0.0.1:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const DeveloperDashboard = () => {
   const { user, isAuthenticated } = useAuth();
@@ -30,57 +30,126 @@ const DeveloperDashboard = () => {
       setLoading(true);
       const token = localStorage.getItem('access_token');
       
-      const response = await axios.get(`${API_URL}/games/my_games/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await apiClient.get('/games/my_games/');
       
       console.log('Загруженные игры:', response.data);
       setGames(response.data);
       
       // Рассчитываем статистику
       if (response.data.length > 0) {
-        const totalDownloads = response.data.reduce((sum, game) => sum + game.downloads, 0);
-        const totalEarnings = response.data.reduce((sum, game) => sum + (game.price * game.downloads * 0.8), 0);
-        const avgRating = response.data.reduce((sum, game) => sum + game.average_rating, 0) / response.data.length;
+        const totalDownloads = response.data.reduce((sum, game) => sum + (game.downloads || 0), 0);
+        const totalEarnings = response.data.reduce((sum, game) => {
+          const price = game.price || 0;
+          const downloads = game.downloads || 0;
+          return sum + (price * downloads * 0.8);
+        }, 0);
+        
+        // Вычисляем средний рейтинг (если есть рейтинги)
+        let avgRating = 0;
+        const gamesWithRating = response.data.filter(game => game.average_rating > 0);
+        if (gamesWithRating.length > 0) {
+          avgRating = gamesWithRating.reduce((sum, game) => sum + game.average_rating, 0) / gamesWithRating.length;
+        }
         
         setStats({
           totalGames: response.data.length,
           totalDownloads: totalDownloads,
           totalEarnings: totalEarnings,
-          averageRating: avgRating || 0,
+          averageRating: avgRating,
         });
       }
       
       setError(null);
     } catch (err) {
       console.error('Ошибка загрузки игр:', err);
-      setError('Не удалось загрузить игры');
+      
+      if (err.response?.status === 401) {
+        setError('Сессия истекла. Пожалуйста, войдите снова');
+      } else if (err.response?.status === 403) {
+        setError('У вас нет прав для просмотра этой страницы');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Превышено время ожидания ответа от сервера');
+      } else if (err.code === 'ERR_NETWORK') {
+        setError(
+          process.env.NODE_ENV === 'development'
+            ? 'Не удалось подключиться к серверу. Убедитесь, что Django сервер запущен'
+            : 'Ошибка подключения к серверу. Проверьте интернет-соединение'
+        );
+      } else {
+        setError('Не удалось загрузить игры');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteGame = async (gameId) => {
-    if (!window.confirm('Вы уверены, что хотите удалить игру?')) {
+    if (!window.confirm('Вы уверены, что хотите удалить игру? Это действие нельзя отменить.')) {
       return;
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      await axios.delete(`${API_URL}/games/${gameId}/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiClient.delete(`/games/${gameId}/`);
       
       // Обновляем список игр после удаления
       fetchMyGames();
+      
+      // Показываем уведомление об успехе
+      alert('Игра успешно удалена');
     } catch (err) {
       console.error('Ошибка удаления игры:', err);
-      alert('Не удалось удалить игру');
+      
+      if (err.response?.status === 401) {
+        alert('Сессия истекла. Пожалуйста, войдите снова');
+      } else if (err.response?.status === 403) {
+        alert('У вас нет прав для удаления этой игры');
+      } else {
+        alert('Не удалось удалить игру. Попробуйте позже');
+      }
     }
   };
 
+  const getGameStatusLabel = (status) => {
+    switch(status) {
+      case 'published':
+        return { text: 'Опубликовано', color: 'bg-green-100 text-green-700' };
+      case 'draft':
+        return { text: 'Черновик', color: 'bg-yellow-100 text-yellow-700' };
+      case 'moderation':
+        return { text: 'На модерации', color: 'bg-blue-100 text-blue-700' };
+      case 'rejected':
+        return { text: 'Отклонено', color: 'bg-red-100 text-red-700' };
+      default:
+        return { text: status, color: 'bg-gray-100 text-gray-700' };
+    }
+  };
+
+  const getImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    // Убираем дублирование /api в URL
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${path}`;
+  };
+
   // Если не авторизован или не разработчик
-  if (!isAuthenticated || (user?.role !== 'developer' && user?.role !== 'admin')) {
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="card p-8 text-center">
+          <h2 className="text-2xl font-bold mb-4">Требуется авторизация</h2>
+          <p className="text-gray-600 mb-4">
+            Для доступа к кабинету разработчика необходимо войти в систему
+          </p>
+          <Link to="/auth" className="btn-primary">
+            Войти
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (user?.role !== 'developer' && user?.role !== 'admin') {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="card p-8 text-center">
@@ -109,6 +178,11 @@ const DeveloperDashboard = () => {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-2 text-xs">
+              API URL: {API_URL}
+            </div>
+          )}
         </div>
       )}
 
@@ -126,7 +200,9 @@ const DeveloperDashboard = () => {
                 </div>
                 <div>
                   <div className="font-semibold">{user?.username}</div>
-                  <div className="text-sm text-gray-500">Статус: Активен</div>
+                  <div className="text-sm text-gray-500">
+                    {user?.role === 'admin' ? 'Администратор' : 'Разработчик'}
+                  </div>
                 </div>
               </div>
 
@@ -194,7 +270,7 @@ const DeveloperDashboard = () => {
             </div>
             <div className="card p-6">
               <div className="text-2xl font-bold text-purple-600 mb-2">
-                {stats.averageRating.toFixed(1)}
+                {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : 'Нет'}
               </div>
               <div className="text-sm text-gray-600">Средний рейтинг</div>
             </div>
@@ -219,59 +295,63 @@ const DeveloperDashboard = () => {
                     </div>
                   ) : games.length > 0 ? (
                     <div className="space-y-4">
-                      {games.map((game) => (
-                        <div key={game.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                          <div className="flex items-center space-x-4">
-                            {game.cover_image ? (
-                              <img 
-                                src={`http://127.0.0.1:8000${game.cover_image}`} 
-                                alt={game.title}
-                                className="w-16 h-16 object-cover rounded-lg"
-                              />
-                            ) : (
-                              <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                                <span className="text-2xl">🎮</span>
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-medium text-lg">{game.title}</div>
-                              <div className="text-sm text-gray-500">
-                                Статус: 
-                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                                  game.status === 'published' 
-                                    ? 'bg-green-100 text-green-700' 
-                                    : 'bg-yellow-100 text-yellow-700'
-                                }`}>
-                                  {game.status === 'published' ? 'Опубликовано' : 'Черновик'}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-500 mt-1">
-                                Скачиваний: {game.downloads} | Рейтинг: {game.average_rating.toFixed(1)} ⭐
+                      {games.map((game) => {
+                        const status = getGameStatusLabel(game.status);
+                        return (
+                          <div key={game.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                            <div className="flex items-center space-x-4">
+                              {game.cover_image ? (
+                                <img 
+                                  src={getImageUrl(game.cover_image)} 
+                                  alt={game.title}
+                                  className="w-16 h-16 object-cover rounded-lg"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = 'https://via.placeholder.com/64?text=No+Image';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                                  <span className="text-2xl">🎮</span>
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium text-lg">{game.title}</div>
+                                <div className="text-sm text-gray-500">
+                                  Статус: 
+                                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${status.color}`}>
+                                    {status.text}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-gray-500 mt-1">
+                                  Скачиваний: {game.downloads || 0} | 
+                                  Рейтинг: {game.average_rating > 0 ? game.average_rating.toFixed(1) : 'Нет'} ⭐
+                                </div>
                               </div>
                             </div>
+                            <div className="flex items-center space-x-2">
+                              <Link
+                                to={`/game/${game.id}`}
+                                className="text-blue-600 hover:text-blue-800 text-sm px-3 py-1 rounded hover:bg-blue-50"
+                              >
+                                Просмотр
+                              </Link>
+                              <Link
+                                to={`/edit-game/${game.id}`}
+                                className="text-green-600 hover:text-green-800 text-sm px-3 py-1 rounded hover:bg-green-50"
+                              >
+                                Редактировать
+                              </Link>
+                              <button
+                                onClick={() => handleDeleteGame(game.id)}
+                                className="text-red-600 hover:text-red-800 text-sm px-3 py-1 rounded hover:bg-red-50"
+                              >
+                                Удалить
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Link
-                              to={`/game/${game.id}`}
-                              className="text-blue-600 hover:text-blue-800 text-sm px-3 py-1 rounded hover:bg-blue-50"
-                            >
-                              Просмотр
-                            </Link>
-                            <Link
-                              to={`/edit-game/${game.id}`}
-                              className="text-green-600 hover:text-green-800 text-sm px-3 py-1 rounded hover:bg-green-50"
-                            >
-                              Редактировать
-                            </Link>
-                            <button
-                              onClick={() => handleDeleteGame(game.id)}
-                              className="text-red-600 hover:text-red-800 text-sm px-3 py-1 rounded hover:bg-red-50"
-                            >
-                              Удалить
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-12">
@@ -314,12 +394,21 @@ const DeveloperDashboard = () => {
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     Заработок
                   </h3>
-                  <p className="text-gray-600">
-                    Ваш баланс: {stats.totalEarnings.toFixed(2)} ₽
+                  <p className="text-gray-600 mb-4">
+                    Ваш баланс: <span className="font-bold text-accent">{stats.totalEarnings.toFixed(2)} ₽</span>
                   </p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Выплаты производятся ежемесячно при достижении 1000₽
+                  <p className="text-sm text-gray-500">
+                    Минимальная сумма для вывода: 1000 ₽
                   </p>
+                  {stats.totalEarnings >= 1000 ? (
+                    <button className="mt-4 btn-primary">
+                      Запросить выплату
+                    </button>
+                  ) : (
+                    <p className="mt-4 text-xs text-gray-400">
+                      До выплаты осталось: {(1000 - stats.totalEarnings).toFixed(2)} ₽
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -375,6 +464,18 @@ const DeveloperDashboard = () => {
                   <div className="text-green-600 font-medium mb-2">Выплаты</div>
                   <p className="text-sm text-gray-700">
                     Выплаты производятся ежемесячно при достижении минимальной суммы в 1000₽.
+                  </p>
+                </div>
+                <div className="p-4 bg-purple-50 rounded-lg">
+                  <div className="text-purple-600 font-medium mb-2">Модерация</div>
+                  <p className="text-sm text-gray-700">
+                    Игры проходят модерацию в течение 24 часов. Статус можно отслеживать в списке игр.
+                  </p>
+                </div>
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <div className="text-orange-600 font-medium mb-2">Продвижение</div>
+                  <p className="text-sm text-gray-700">
+                    Игры с высоким рейтингом попадают на главную страницу и получают больше скачиваний.
                   </p>
                 </div>
               </div>

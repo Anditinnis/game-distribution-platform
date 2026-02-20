@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const GamePage = () => {
   const { id } = useParams();
   const [game, setGame] = useState(null);
@@ -15,7 +16,7 @@ const GamePage = () => {
   const fetchGame = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/games/${id}/`);
+      const response = await fetch(`${API_URL}/games/${id}/`);
       
       if (!response.ok) {
         throw new Error('Игра не найдена');

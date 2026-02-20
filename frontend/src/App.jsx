@@ -10,9 +10,15 @@ import ForumPage from './pages/ForumPage';
 import TopicPage from './pages/TopicPage';
 import ProfilePage from './pages/ProfilePage';
 import UploadGamePage from './pages/UploadGamePage';
+import EditGamePage from './pages/EditGamePage'; // Добавьте если есть
 import { useAuth } from './hooks/useAuth';
 import './index.css';
 import './App.css';
+
+// Конфигурация API
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const WS_URL = import.meta.env.REACT_APP_WS_URL || 'ws://localhost:8000';
+
 // Компонент навигации
 const Navigation = () => {
   const location = useLocation();
@@ -26,6 +32,12 @@ const Navigation = () => {
     if (!isAuthenticated) return '/auth';
     if (user?.role === 'developer' || user?.role === 'admin') return '/developer';
     return '/profile?tab=developer';
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    // Перенаправляем на главную после выхода
+    window.location.href = '/';
   };
 
   if (loading) {
@@ -83,7 +95,7 @@ const Navigation = () => {
                     </span>
                   </div>
                 </Link>
-                <button onClick={logout} className="logout-btn" title="Выйти">
+                <button onClick={handleLogout} className="logout-btn" title="Выйти">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
@@ -98,12 +110,15 @@ const Navigation = () => {
               </Link>
             )}
             
-            <a href="http://localhost:8000/admin/" target="_blank" rel="noopener noreferrer" className="admin-btn">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2"/>
-              </svg>
-              <span>Админ</span>
-            </a>
+            {/* Админ-панель доступна только в разработке или админам */}
+            {(process.env.NODE_ENV === 'development' || user?.role === 'admin') && (
+              <a href={`${API_URL}/admin/`} target="_blank" rel="noopener noreferrer" className="admin-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2"/>
+                </svg>
+                <span>Админ</span>
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -114,29 +129,48 @@ const Navigation = () => {
 // Компонент футера
 const Footer = () => {
   const [backendStatus, setBackendStatus] = useState('checking');
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId;
+
+    const checkBackendStatus = async () => {
+      try {
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch(`${API_URL}/api/games/`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (isMounted) {
+          setBackendStatus(response.ok ? 'online' : 'offline');
+        }
+      } catch (error) {
+        if (isMounted) {
+          setBackendStatus('offline');
+        }
+      }
+    };
+
     checkBackendStatus();
     const interval = setInterval(checkBackendStatus, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
-  const checkBackendStatus = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/games/', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(3000)
-      });
-      setBackendStatus(response.ok ? 'online' : 'offline');
-    } catch (error) {
-      setBackendStatus('offline');
-    }
-  };
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [retryCount]);
 
   const handleRetry = () => {
     setBackendStatus('checking');
-    checkBackendStatus();
+    setRetryCount(prev => prev + 1);
   };
 
   return (
@@ -178,12 +212,12 @@ const Footer = () => {
             <h4>Ресурсы</h4>
             <ul>
               <li>
-                <a href="http://localhost:8000/admin/" target="_blank" rel="noopener noreferrer">
+                <a href={`${API_URL}/admin/`} target="_blank" rel="noopener noreferrer">
                   <span>⚙️</span> Админ-панель
                 </a>
               </li>
               <li>
-                <a href="http://localhost:8000/api/" target="_blank" rel="noopener noreferrer">
+                <a href={`${API_URL}/api/`} target="_blank" rel="noopener noreferrer">
                   <span>📚</span> API Документация
                 </a>
               </li>
@@ -207,6 +241,9 @@ const Footer = () => {
               className={`status-indicator status-${backendStatus}`} 
               onClick={handleRetry}
               title={backendStatus === 'offline' ? 'Нажмите для повторной проверки' : 'Статус подключения'}
+              role="button"
+              tabIndex={0}
+              onKeyPress={(e) => e.key === 'Enter' && handleRetry()}
             >
               <div className="status-dot"></div>
               <span className="status-text">
@@ -228,6 +265,17 @@ const Footer = () => {
   );
 };
 
+// Компонент для отображения версии и окружения (только в разработке)
+const DevEnvironmentIndicator = () => {
+  if (process.env.NODE_ENV !== 'development') return null;
+  
+  return (
+    <div className="fixed bottom-2 left-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs z-50">
+      DEV MODE | API: {API_URL}
+    </div>
+  );
+};
+
 // Главный компонент
 function App() {
   return (
@@ -245,9 +293,22 @@ function App() {
               <Route path="/forum/topic/:id" element={<TopicPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/upload" element={<UploadGamePage />} />
+              <Route path="/edit-game/:id" element={<EditGamePage />} />
+              
+              {/* 404 страница */}
+              <Route path="*" element={
+                <div className="container mx-auto px-4 py-16 text-center">
+                  <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
+                  <p className="text-xl text-gray-600 mb-8">Страница не найдена</p>
+                  <Link to="/" className="btn-primary">
+                    Вернуться на главную
+                  </Link>
+                </div>
+              } />
             </Routes>
           </main>
           <Footer />
+          <DevEnvironmentIndicator />
         </div>
       </Router>
     </Provider>

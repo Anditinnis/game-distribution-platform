@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000/api';
+// Используем переменную окружения для API URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,12 +17,22 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Создаем экземпляр axios с базовыми настройками
+  const api = axios.create({
+    baseURL: API_URL,
+    timeout: 10000, // 10 секунд таймаут
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     console.log('Отправка данных:', formData);
+    console.log('API URL:', API_URL);
 
     try {
       let response;
@@ -37,8 +48,8 @@ const AuthPage = () => {
         
         console.log('Данные для входа:', loginData);
         
-        // Используем /token/ эндпоинт (он точно работает)
-        response = await axios.post(`${API_URL}/token/`, loginData);
+        // Используем /token/ эндпоинт
+        response = await api.post('/token/', loginData);
         console.log('Ответ от сервера:', response.data);
         
         // Проверяем, есть ли токен в ответе
@@ -49,8 +60,10 @@ const AuthPage = () => {
           
           // Получаем информацию о пользователе
           try {
-            const userResponse = await axios.get(`${API_URL}/users/me/`, {
-              headers: { Authorization: `Bearer ${response.data.access}` }
+            const userResponse = await api.get('/users/me/', {
+              headers: { 
+                Authorization: `Bearer ${response.data.access}` 
+              }
             });
             
             console.log('Информация о пользователе:', userResponse.data);
@@ -89,7 +102,7 @@ const AuthPage = () => {
 
         console.log('Данные для регистрации:', registerData);
 
-        response = await axios.post(`${API_URL}/users/register/`, registerData);
+        response = await api.post('/users/register/', registerData);
         console.log('Регистрация успешна:', response.data);
 
         // Если после регистрации сразу приходят токены
@@ -114,8 +127,17 @@ const AuthPage = () => {
       console.error('Ошибка:', err);
       console.error('Детали ошибки:', err.response?.data);
 
-      if (err.response?.status === 401) {
+      // Обработка различных ошибок
+      if (err.code === 'ECONNABORTED') {
+        setError('Превышено время ожидания ответа от сервера');
+      } else if (err.response?.status === 401) {
         setError('Неверное имя пользователя или пароль');
+      } else if (err.response?.status === 403) {
+        setError('Доступ запрещен');
+      } else if (err.response?.status === 404) {
+        setError('API эндпоинт не найден. Проверьте настройки сервера');
+      } else if (err.response?.status >= 500) {
+        setError('Ошибка на сервере. Попробуйте позже');
       } else if (err.response?.data) {
         const errorData = err.response.data;
         if (typeof errorData === 'object') {
@@ -131,7 +153,12 @@ const AuthPage = () => {
           setError(errorData);
         }
       } else if (err.code === 'ERR_NETWORK') {
-        setError('Не удалось подключиться к серверу. Убедитесь, что Django сервер запущен.');
+        setError(
+          'Не удалось подключиться к серверу. ' +
+          (process.env.NODE_ENV === 'development' 
+            ? 'Убедитесь, что Django сервер запущен на http://127.0.0.1:8000' 
+            : 'Проверьте подключение к интернету или обратитесь к администратору')
+        );
       } else {
         setError('Произошла ошибка при подключении к серверу');
       }
@@ -151,6 +178,13 @@ const AuthPage = () => {
     <div className="min-h-[80vh] flex items-center justify-center py-12">
       <div className="card max-w-md w-full mx-4">
         <div className="p-8">
+          {/* Информация о режиме работы (только для разработки) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-4 p-2 bg-blue-50 text-blue-600 text-xs rounded-lg">
+              Режим разработки: API = {API_URL}
+            </div>
+          )}
+
           {/* Переключатель форм */}
           <div className="flex mb-8 border-b border-gray-200">
             <button
@@ -181,6 +215,11 @@ const AuthPage = () => {
           {error && (
             <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl">
               {error}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-2 text-xs text-red-500">
+                  Проверьте консоль браузера для деталей (F12)
+                </div>
+              )}
             </div>
           )}
 
