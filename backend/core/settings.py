@@ -16,7 +16,7 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -26,7 +26,10 @@ SECRET_KEY = 'django-insecure-641mhycon0qm2tuc^-(8q2e871(sv5!__wo!^minafl!!@bg-_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [ 
+    'game-distribution-platform.onrender.com',  # ваш текущий домен
+    'localhost',
+    '127.0.0.1',]
 
 
 # Application definition
