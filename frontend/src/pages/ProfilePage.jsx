@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
+import { safeToFixed, safeFormatDate } from '../utils/format';
 
 const ProfilePage = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -13,46 +14,6 @@ const ProfilePage = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/');
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Не указана';
-    
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Не указана';
-      
-      return date.toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      console.error('Ошибка форматирования даты:', error);
-      return 'Не указана';
-    }
-  };
-
-  // БЕЗОПАСНОЕ ФОРМАТИРОВАНИЕ БАЛАНСА
-  const formatBalance = (balance) => {
-    if (balance === undefined || balance === null) return '0.00';
-    
-    // Если это строка, пробуем преобразовать в число
-    if (typeof balance === 'string') {
-      const num = parseFloat(balance);
-      return isNaN(num) ? '0.00' : num.toFixed(2);
-    }
-    
-    // Если это число
-    if (typeof balance === 'number') {
-      return balance.toFixed(2);
-    }
-    
-    // Если это объект или что-то еще
-    console.warn('Неизвестный тип баланса:', typeof balance, balance);
-    return '0.00';
   };
 
   const getRoleDisplay = () => {
@@ -151,8 +112,7 @@ const ProfilePage = () => {
                 <div className="p-5 bg-blue-50 rounded-xl border border-blue-100">
                   <div className="text-sm text-blue-600 mb-1">Баланс</div>
                   <div className="text-2xl font-bold text-blue-700">
-                    {/* ✅ ИСПОЛЬЗУЕМ БЕЗОПАСНУЮ ФУНКЦИЮ */}
-                    {formatBalance(user?.balance)} ₽
+                    {safeToFixed(user?.balance)} ₽
                   </div>
                   <div className="text-xs text-blue-500 mt-1">
                     Доступно для вывода
@@ -174,14 +134,14 @@ const ProfilePage = () => {
                 <div className="flex items-center p-4 bg-gray-50 rounded-lg">
                   <div className="w-32 text-sm text-gray-600">Дата регистрации</div>
                   <div className="flex-1 font-medium">
-                    {formatDate(user?.date_joined)}
+                    {safeFormatDate(user?.date_joined)}
                   </div>
                 </div>
 
                 <div className="flex items-center p-4 bg-gray-50 rounded-lg">
                   <div className="w-32 text-sm text-gray-600">Последний вход</div>
                   <div className="flex-1 font-medium">
-                    {formatDate(user?.last_login) || 'Не выполнялся'}
+                    {safeFormatDate(user?.last_login) || 'Не выполнялся'}
                   </div>
                 </div>
 
